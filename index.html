@@ -1,1 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
 
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pagespeed insights</title>
+</head>
+
+<body>
+  <style>
+    table {
+      font-family: arial, sans-serif;
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    td,
+    th {
+      border: 1px solid #dddddd;
+      text-align: left;
+      padding: 8px;
+    }
+
+    tr:nth-child(even) {
+      background-color: #dddddd;
+    }
+  </style>
+  <h1>Pagespeed insights results</h1>
+
+
+  <div id="urls">
+
+  </div>
+  <div id="results">
+    <h2>Mobile Results:</h2>
+    <table id="table1">
+      <thead>
+        <tr>
+          <th>Page URL</th>
+          <th>Largest Contentful Paint</th>
+          <th>First Contentful Paint</th>
+          <th>Speed Index</th>
+          <th>Time To Interactive</th>
+          <th>First Meaningful Paint</th>
+        </tr>
+      </thead>
+      <tbody id="mobileResultsTable"></tbody>
+    </table>
+    <button id="btnExportToCsv" type="button" class="button">Export mobile data to CSV</button>
+    <h2>Desktop Results:</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Page URL</th>
+          <th>Largest Contentful Paint</th>
+          <th>First Contentful Paint</th>
+          <th>Speed Index</th>
+          <th>Time To Interactive</th>
+          <th>First Meaningful Paint</th>
+        </tr>
+      </thead>
+      <tbody id="desktopResultsTable"></tbody>
+    </table>
+    <p id="loading">Generating Results...... :D</p>
+    <button id="btnExportToCsvTwo" type="button" class="button">Export desktop data to CSV</button>
+  </div>
+  <script>
+    function showLoadingContent() {
+      const loadingContent = document.getElementById("loading");
+      loadingContent.innerHTML = 'done!'
+    }
+
+    function run(page, strategy) {
+      // const url = ;
+      fetch(setUpQuery(page, strategy))
+        .then(response => response.json())
+        .then(json => {
+          // See https://developers.google.com/speed/docs/insights/v5/reference/pagespeedapi/runpagespeed#response
+          // to learn more about each of the properties in the response object.
+          // showInitialContent(json.id);
+          // const cruxMetrics = {
+          //   "First Contentful Paint": json.loadingExperience.metrics.FIRST_CONTENTFUL_PAINT_MS.category,
+          //   "First Input Delay": json.loadingExperience.metrics.FIRST_INPUT_DELAY_MS.category
+          // };
+          // showCruxContent(cruxMetrics);
+          const lighthouse = json.lighthouseResult;
+          console.log(lighthouse)
+          const lighthouseMetrics = {
+            'LCP': lighthouse.audits['largest-contentful-paint'].displayValue,
+            'FCP': lighthouse.audits['first-contentful-paint'].displayValue,
+            'SI': lighthouse.audits['speed-index'].displayValue,
+            'I': lighthouse.audits['interactive'].displayValue,
+            'FMP': lighthouse.audits['first-meaningful-paint'].displayValue,
+            /*         'First CPU Idle': lighthouse.audits['first-cpu-idle'].description,
+                    'Estimated Input Latency': lighthouse.audits['estimated-input-latency'].displayValue */
+          };
+          console.log("xxxxxxx")
+          console.log(json);
+          console.log("yyyyyyy")
+          strategy === 'mobile' ?
+            showLighthouseContentMobile(lighthouseMetrics, json.id, strategy) :
+            showLighthouseContentDesktop(lighthouseMetrics, json.id, strategy);
+        })
+        .then(() => {
+          showLoadingContent();
+        });
+    }
+
+    // ?key=AIzaSyDeIoddt-PQJBUKx6KPNRf8p06gg5VRVgY
+    // &strategy=' + strategy
+    function setUpQuery(urlgoeshere, strategy) {
+      const api = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
+      const parameters = {
+        url: encodeURIComponent(urlgoeshere)
+      };
+      let query = `${api}?`;
+      for (key in parameters) {
+        query += `${key}=${parameters[key]}&key=APIKEY&strategy=${strategy}`;
+        // console.log("keyyyy")
+        // console.log(`${key}=${parameters[key]}`)
+      }
+      return query;
+    }
+
+    function showInitialContent(id) {
+      // document.body.innerHTML = '';
+      // const title = document.createElement('h1');
+      // title.textContent = 'PageSpeed Insights API Demo';
+      // document.body.appendChild(title);
+      const urls = document.getElementById("urls");
+      const page = document.createElement('p');
+      page.textContent = `Page tested: ${id}`;
+      urls.appendChild(page);
+    }
+
+    function showCruxContent(cruxMetrics) {
+      const results = document.getElementById("results");
+      const cruxHeader = document.createElement('h2');
+      cruxHeader.textContent = "Chrome User Experience Report Results";
+      results.appendChild(cruxHeader);
+      for (key in cruxMetrics) {
+        const p = document.createElement('p');
+        p.textContent = `${key}: ${cruxMetrics[key]}`;
+        document.body.appendChild(p);
+      }
+    }
+
+    function showLighthouseContentMobile(lighthouseMetrics, id, strategy) {
+      const resultsTable = document.getElementById("mobileResultsTable");
+
+      const tableRow = document.createElement('tr');
+
+      const pageUrl = document.createElement('td');
+      pageUrl.innerHTML = `<strong>${id}</strong>`;
+      tableRow.appendChild(pageUrl);
+
+      for (key in lighthouseMetrics) {
+        const p = document.createElement('td');
+        p.textContent = `${lighthouseMetrics[key]}`;
+        tableRow.appendChild(p);
+      }
+      resultsTable.appendChild(tableRow);
+
+      // console.log("RESULT lighthouseMetrics")
+      // console.log(lighthouseMetrics)
+      // console.log("lighthouseMetrics LENGTH:")
+      // console.log(Object.keys(lighthouseMetrics).length);
+    }
+
+    function showLighthouseContentDesktop(lighthouseMetrics, id, strategy) {
+      const resultsTable = document.getElementById("desktopResultsTable");
+
+      const tableRow = document.createElement('tr');
+
+      const pageUrl = document.createElement('td');
+      pageUrl.innerHTML = `<strong>${id}</strong>`;
+      tableRow.appendChild(pageUrl);
+
+      for (key in lighthouseMetrics) {
+        const p = document.createElement('td');
+        p.textContent = `${lighthouseMetrics[key]}`;
+        tableRow.appendChild(p);
+      }
+      resultsTable.appendChild(tableRow);
+    }
+
+    run('https://www.bmo.com/en-ca/main/personal/', 'mobile');
+    run('https://www.bmo.com/en-ca/main/personal/', 'desktop');
+
+    run('https://www.bmo.com/fr-ca/principal/particuliers/', 'mobile');
+    run('https://www.bmo.com/fr-ca/principal/particuliers/', 'desktop');
+
+    run('https://www.bmo.com/main/personal/credit-cards/', 'mobile');
+    run('https://www.bmo.com/main/personal/credit-cards/', 'desktop');
+
+    run('https://www.bmo.com/main/personal/mortgages/', 'mobile');
+    run('https://www.bmo.com/main/personal/mortgages/', 'desktop');
+
+    run('https://www.bmo.com/main/personal/bank-accounts/', 'mobile');
+    run('https://www.bmo.com/main/personal/bank-accounts/', 'desktop');
+
+
+    const dataTable = document.getElementById("table1");
+    const btnExportToCsv = document.getElementById("btnExportToCsv");
+
+    btnExportToCsv.addEventListener("click", () => {
+      const exporter = new TableCSVExporter(dataTable);
+      const csvOutput = exporter.convertToCSV();
+      const csvBlob = new Blob([csvOutput], { type: "text/csv" });
+      const blobUrl = URL.createObjectURL(csvBlob);
+      const anchorElement = document.createElement("a");
+
+      anchorElement.href = blobUrl;
+      anchorElement.download = "table-export.csv";
+      anchorElement.click();
+
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 500);
+    });
+
+    class TableCSVExporter {
+      constructor(table, includeHeaders = true) {
+        this.table = table;
+        this.rows = Array.from(table.querySelectorAll("tr"));
+
+        if (!includeHeaders && this.rows[0].querySelectorAll("th").length) {
+          this.rows.shift();
+        }
+      }
+
+      convertToCSV() {
+        const lines = [];
+        const numCols = this._findLongestRowLength();
+
+        for (const row of this.rows) {
+          let line = "";
+
+          for (let i = 0; i < numCols; i++) {
+            if (row.children[i] !== undefined) {
+              line += TableCSVExporter.parseCell(row.children[i]);
+            }
+
+            line += (i !== (numCols - 1)) ? "," : "";
+          }
+
+          lines.push(line);
+        }
+
+        return lines.join("\n");
+      }
+
+      _findLongestRowLength() {
+        return this.rows.reduce((l, row) => row.childElementCount > l ? row.childElementCount : l, 0);
+      }
+
+      static parseCell(tableCell) {
+        let parsedValue = tableCell.textContent;
+
+        // Replace all double quotes with two double quotes
+        parsedValue = parsedValue.replace(/"/g, `""`);
+
+        // If value contains comma, new-line or double-quote, enclose in double quotes
+        parsedValue = /[",\n]/.test(parsedValue) ? `"${parsedValue}"` : parsedValue;
+
+        return parsedValue;
+      }
+    }
+  </script>
+</body>
+
+</html>
