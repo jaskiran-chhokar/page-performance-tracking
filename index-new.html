@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>LCP Data Retriever</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            letter-spacing: 0.04rem;
+            padding: 2rem;
+        }
+
+        h1 {
+            text-align: center;
+            color: #3b41c5;
+        }
+
+        div#loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        #loading img {
+            width: 50px;
+        }
+
+        #urlForm {
+            margin: 20px;
+            text-align: center;
+        }
+
+        #urlForm input[type="text"] {
+            padding: 10px 30px;
+            width: 500px;
+            border: 2px solid #3b41c5;
+            border-radius: 4px;
+        }
+
+        #urlForm button {
+            padding: 10px 20px;
+            margin-left: 5px;
+            background-color: #3b41c5;
+            border: 2px solid #3b41c5;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            letter-spacing: 0.05rem;
+            text-transform: uppercase;
+        }
+
+        ::placeholder {
+            color: #3b41c5;
+            /* color: #6f86d6; */
+        }
+
+        #resultsTable {
+            margin: 20px auto;
+            width: 80%;
+            border-collapse: collapse;
+        }
+
+        #resultsTable th,
+        #resultsTable td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+
+        #resultsTable th {
+            background-color: white;
+        }
+
+        #urlList {
+            margin: 20px auto;
+            width: 80%;
+            text-align: left;
+            /* border: 1px dashed #3b41c5; */
+            padding: 1rem 3rem;
+        }
+
+        #urlList li {
+            margin: 5px 0;
+        }
+
+        #urlList button {
+            margin-left: 10px;
+        }
+
+        #removeBtn {
+            background-color: #f78ca0;
+            border: 1px solid #f78ca0;
+            padding: 0.2rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+            letter-spacing: 0.05rem;
+            text-transform: uppercase;
+        }
+
+        #fetchData {
+            padding: 10px 20px;
+            margin-left: 5px;
+            background-color: #3b41c5;
+            border: 2px solid #3b41c5;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            letter-spacing: 0.05rem;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Largest Contentful Paint Data Retriever</h1>
+
+    <div id="urlForm">
+        <input type="text" id="newUrl" placeholder="Enter a new URL to add">
+        <button onclick="addUrl()">Add URL</button>
+    </div>
+
+    <ol id="urlList"></ol>
+
+    <div style="text-align:center;">
+        <button id="fetchData" onclick="fetchLCPData()">Fetch LCP Data</button>
+    </div>
+
+    <div id="loading">
+        <p>Loading data, please wait...</p>
+        <img src="https://i.imgur.com/llF5iyg.gif" alt="Loading...">
+    </div>
+
+    <table id="resultsTable">
+        <thead>
+            <tr>
+                <th>URL</th>
+                <th>LCP Value (ms)</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <script>
+        // === Configuration ===
+
+        // Replace 'YOUR_API_KEY_HERE' with your actual Google PageSpeed Insights API key
+        const API_KEY = 'YOUR_API_KEY_HERE';
+
+        // Initial list of URLs (modifiable in one place)
+        let urlArray = [
+            'https://www.google.com/',
+            'https://developer.mozilla.org/en-US/',
+            // Add more URLs here
+        ];
+
+        // Load URLs from localStorage if available
+        if (localStorage.getItem('urlArray')) {
+            urlArray = JSON.parse(localStorage.getItem('urlArray'));
+        }
+
+        // === URL Management ===
+
+        function displayUrlList() {
+            const urlList = document.getElementById('urlList');
+            urlList.innerHTML = '';
+            urlArray.forEach((url, index) => {
+                const li = document.createElement('li');
+                li.textContent = url;
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = 'Remove';
+                removeBtn.setAttribute('id', 'removeBtn')
+                removeBtn.onclick = () => removeUrl(index);
+                li.appendChild(removeBtn);
+                urlList.appendChild(li);
+            });
+        }
+
+        function addUrl() {
+            const newUrl = document.getElementById('newUrl').value.trim();
+            if (newUrl) {
+                urlArray.push(newUrl);
+                localStorage.setItem('urlArray', JSON.stringify(urlArray));
+                displayUrlList();
+                document.getElementById('newUrl').value = '';
+            } else {
+                alert('Please enter a valid URL.');
+            }
+        }
+
+        function removeUrl(index) {
+            urlArray.splice(index, 1);
+            localStorage.setItem('urlArray', JSON.stringify(urlArray));
+            displayUrlList();
+        }
+
+        // === Fetching LCP Data with Concurrency Control and Retries ===
+
+        async function fetchLCPData() {
+            /*             if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE') {
+                            alert('Please replace YOUR_API_KEY_HERE with your actual Google PageSpeed Insights API key.');
+                            return;
+                        } */
+
+            document.getElementById('loading').style.display = 'block';
+            const resultsTableBody = document.querySelector('#resultsTable tbody');
+            resultsTableBody.innerHTML = '';
+
+            const results = [];
+            const maxConcurrentRequests = 5; // Limit the number of concurrent requests
+            const urlsCopy = [...urlArray]; // Create a copy of the URL array
+            let activeRequests = 0;
+            let index = 0;
+
+            function updateLoadingMessage(completed, total) {
+                document.getElementById('loading').innerHTML = `
+                    <p>Loading data, please wait... (${completed}/${total})</p>
+                    <img src="https://i.imgur.com/llF5iyg.gif" alt="Loading...">
+                `;
+            }
+
+            return new Promise((resolve) => {
+                const totalUrls = urlsCopy.length;
+                let completedUrls = 0;
+
+                async function next() {
+                    while (activeRequests < maxConcurrentRequests && index < totalUrls) {
+                        const url = urlsCopy[index++];
+                        activeRequests++;
+                        fetchWithRetry(url)
+                            .then((result) => {
+                                displayResults(resultsTableBody, result.url, result.lcp);
+                            })
+                            .catch((error) => {
+                                console.error(`Error fetching data for ${url}:`, error);
+                                results.push({ url, lcp: 'Error retrieving data' });
+                            })
+                            .finally(() => {
+                                activeRequests--;
+                                completedUrls++;
+
+                                updateLoadingMessage(completedUrls, totalUrls);
+                                if (completedUrls === totalUrls) {
+                                    document.getElementById('loading').style.display = 'none';
+                                    resolve();
+                                } else {
+                                    next();
+                                }
+                            });
+                    }
+                }
+                updateLoadingMessage(completedUrls, totalUrls);
+                next();
+            });
+        }
+
+        async function fetchWithRetry(url, retries = 3, timeout = 120000) {
+            let attempt = 0;
+            const delay = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
+
+            while (attempt <= retries) {
+                try {
+                    const controller = new AbortController();
+                    const id = setTimeout(() => controller.abort(), timeout); // Set custom timeout
+                    const response = await fetch(`https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile&key=${API_KEY}`, {
+                        signal: controller.signal,
+                    });
+                    clearTimeout(id);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const lcp = data.loadingExperience.metrics.LARGEST_CONTENTFUL_PAINT_MS.percentile || 'Data not available';
+                    return { url, lcp };
+                } catch (error) {
+                    attempt++;
+                    if (attempt > retries) {
+                        throw error;
+                    }
+                    console.warn(`Attempt ${attempt} failed for ${url}. Retrying in 5 seconds...`);
+                    await delay(5000); // Wait 5 seconds before retrying
+                }
+            }
+        }
+
+        function displayResults(tableBody, resultURL, resultLCP) {
+            // results.forEach(({ url, lcp }) => {
+            const row = document.createElement('tr');
+            const urlCell = document.createElement('td');
+            const lcpCell = document.createElement('td');
+
+            urlCell.textContent = resultURL;
+            lcpCell.textContent = Number(resultLCP / 1000);
+
+            row.appendChild(urlCell);
+            row.appendChild(lcpCell);
+            tableBody.appendChild(row);
+            // });
+        }
+
+        // Initialize the page
+        displayUrlList();
+    </script>
+</body>
+
+</html>
